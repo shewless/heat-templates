@@ -163,4 +163,4 @@ resources:
 outputs:
   device_ips:
     description: "Device IPs names"
-    value: { list_join: [', ', { get_attr: [device_group, server_name] }, { get_attr: [devices_group, server_name] }] }
+    value: { list_join: [', ', { get_attr: [device_group, floating_ip] }, { get_attr: [devices_group, floating_ip] }] }
