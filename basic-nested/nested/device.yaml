@@ -1,0 +1,114 @@
+heat_template_version: 2016-04-08
+
+parameters:
+  ssh_key:
+    type: string
+    label: "Your SSH keypair name (pre-create please!)"
+    description: |
+        If you have not created your key, please go to
+        Project/Compute/Access & Security, and either import
+        one or create one. If you create it, make sure you keep
+        the downloaded file (as you don't get a second chance)
+    default: default
+
+  public_network:
+    type: string
+    label: Public External Network
+    description: Public Network with Floating IP addresses
+    default: "ext-net"
+
+  flavor:
+    type: string
+    label: "Flavour (default 'm1.small')"
+    description: "Flavour"
+    default: m1.small
+
+  image:
+    type: string
+    label: "Server Image"
+    description: "Image to load"
+    default: "Ubuntu 16.04.1 64-bit"
+
+  index:
+    type: string 
+    label: "Index of server"
+    description: "Index of server (can be empty string)"
+    default: ""
+
+  ctrl_net:
+    type: string
+    label: "Control network resource"
+    description: "Control network resource"
+ 
+  data_net:
+    type: string
+    label: "Data network resource"
+    description: "Data network resource"
+
+  # This is a hack for Centos because we need to explicitly configure
+  # the second interface using "configureInterfaces". 
+  data_netmask:
+    type: string
+    label: "Data netmask"
+    description: "Data netmask"
+    default: "255.255.0.0"
+
+  stack_name:
+    type: string
+    label: "Stack name"
+    description: "Stack name (usually OS::stack_name)"
+
+  security_group:
+    type: string
+    label: "Security group"
+    description: "Security group for control network"
+
+resources:
+  ctrl_port:
+    type: OS::Neutron::Port
+    properties:
+      name:
+        str_replace:
+          template: ctrl-port-$stack_name$index
+          params:
+            $stack_name: { get_param: stack_name }
+            $index: { get_param: index }
+      network: { get_param: ctrl_net }
+      security_groups:
+      - { get_param: security_group }
+  data_port:
+    type: OS::Neutron::Port
+    properties:
+      name:
+        str_replace:
+          template: data-port-$stack_name$index
+          params:
+            $stack_name: { get_param: stack_name }
+            $index: { get_param: index }
+      network: { get_param: data_net }
+  server:
+    type: OS::Nova::Server
+    properties:
+      name:
+        str_replace:
+          template: $stack_name$index
+          params:
+            $stack_name: { get_param: stack_name }
+            $index: { get_param: index }
+      key_name: { get_param: 'ssh_key' }
+      image: { get_param: 'image' }
+      flavor: { get_param: 'flavor' } 
+      networks:
+        - port: { get_resource: ctrl_port }
+        - port: { get_resource: data_port }
+
+  floating:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_network }
+      port_id: { get_resource: ctrl_port }
+
+outputs:
+  floating_ip:
+    description: "Floating IP of server"
+    value: { get_attr: [floating, floating_ip_address] }
